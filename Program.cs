@@ -16,15 +16,6 @@ namespace Helper
             Logger.Default = new LogHelper();
             Directory.CreateDirectory("out/");
 
-            if (!File.Exists("files/globalgamemanagers.assets"))
-            {
-                using ZipFile archive = new("files/game_files.zip");
-                archive.Password = "Paranormasight";
-                archive.Encryption = EncryptionAlgorithm.PkzipWeak;
-                archive.StatusMessageTextWriter = Console.Out;
-                archive.ExtractAll("files", ExtractExistingFileAction.OverwriteSilently);
-            }
-
             RemoveHeader();
             MakePatch();
             AddHeader();
@@ -42,6 +33,7 @@ namespace Helper
 
             foreach (var fileName in FILE_NAMES)
             {
+                if (!File.Exists($"files/{fileName}")) continue;
                 byte[] data = File.ReadAllBytes($"files/{fileName}");
                 var index = 0;
                 while (index < data.Length)
@@ -66,6 +58,7 @@ namespace Helper
             };
             foreach (var fileName in FILE_NAMES)
             {
+                if (!File.Exists($"out/{fileName}-mod")) continue;
                 Bundle bundleData;
                 using (var reader = new BundleHelper.EndianBinaryReader(File.OpenRead($"out/{fileName}-mod")))
                 {
@@ -114,7 +107,7 @@ namespace Helper
             };
             AssetsManager manager = new();
 
-            manager.LoadFiles(FILE_NAMES);
+            manager.LoadFiles(FILE_NAMES.Where(x => File.Exists(x)).ToArray());
 
             foreach (var assetsFile in manager.assetsFileList)
             {
@@ -251,12 +244,17 @@ namespace Helper
         static void CreatePatchFolder()
         {
             Directory.CreateDirectory("out/patch/PARANORMASIGHT_Data/StreamingAssets/");
-            File.Copy("out/resources.assets", "out/patch/PARANORMASIGHT_Data/resources.assets", true);
-            File.Copy("out/sharedassets0.assets", "out/patch/PARANORMASIGHT_Data/sharedassets0.assets", true);
-            File.Copy("out/a035", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a035", true);
-            File.Copy("out/a035", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a035", true);
-            File.Copy("out/a036", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a036", true);
-            File.Copy("out/a038", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a038", true);
+            Copy("out/resources.assets", "out/patch/PARANORMASIGHT_Data/resources.assets");
+            Copy("out/sharedassets0.assets", "out/patch/PARANORMASIGHT_Data/sharedassets0.assets");
+            Copy("out/a035", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a035");
+            Copy("out/a036", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a036");
+            Copy("out/a038", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a038");
+        }
+
+        static private void Copy(string source, string destination)
+        {
+            if (!File.Exists(source)) return;
+            File.Copy(source, destination, true);
         }
     }
 }
