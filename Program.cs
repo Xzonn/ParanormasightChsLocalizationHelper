@@ -144,6 +144,7 @@ namespace Helper
                     continue;
                 }
 
+                Console.WriteLine($"Saving: {fileName}");
                 assetsFile.SaveAs($"out/{fileName}", replaceStreams);
                 replaceStreams.Values.ToList().ForEach(x => x.Close());
             }
@@ -160,6 +161,7 @@ namespace Helper
             TypeTreeHelper.WriteType(type, m_Type, bw);
             replaceStreams[m_TextAsset.m_PathID] = memoryStream;
 
+            Console.WriteLine($"Replacing: (TextAsset) {m_TextAsset.assetsFile.fileName}/{m_TextAsset.m_Name}");
         }
 
         static void ReplaceTMPFont(MonoBehaviour m_MonoBehaviour, ref Dictionary<long, Stream> replaceStreams)
@@ -187,6 +189,8 @@ namespace Helper
             BinaryWriter bw = new(memoryStream);
             TypeTreeHelper.WriteType(type, m_Type, bw);
             replaceStreams[m_MonoBehaviour.m_PathID] = memoryStream;
+
+            Console.WriteLine($"Replacing: (MonoBehaviour) {m_MonoBehaviour.assetsFile.fileName}/{m_MonoBehaviour.m_Name}");
         }
 
         static void ReplaceTMPAtlas(Texture2D m_Texture2D, ref Dictionary<long, Stream> replaceStreams)
@@ -198,14 +202,18 @@ namespace Helper
                 m_Type = TypeTreeHelper.LoadTypeTree(new BinaryReader(fs));
             }
             var type = m_Texture2D.ToType(m_Type);
-            byte[] rawData = (byte[])type["image data"]!;
-            if (rawData.Length == 0)
-            {
-                return;
-            }
 
             int width = (int)type["m_Width"]!;
             int height = (int)type["m_Height"]!;
+            byte[] rawData = (byte[])type["image data"]!;
+            if (rawData.Length == 0)
+            {
+                var m_StreamData = (OrderedDictionary)type["m_StreamData"]!;
+                m_StreamData["path"] = "";
+                m_StreamData["offset"] = (ulong)0;
+                m_StreamData["size"] = (uint)0;
+                rawData = new byte[width * height];
+            }
 
             Bitmap bitmap = new($"files/{m_Texture2D.m_Name}.png");
             for (int y = 0; y < height; y++)
@@ -222,6 +230,8 @@ namespace Helper
             BinaryWriter bw = new(memoryStream);
             TypeTreeHelper.WriteType(type, m_Type, bw);
             replaceStreams[m_Texture2D.m_PathID] = memoryStream;
+
+            Console.WriteLine($"Replacing: (Texture2D) {m_Texture2D.assetsFile.fileName}/{m_Texture2D.m_Name}");
         }
 
         static void ReplaceTrueTypeFont(AssetStudio.Font m_Font, ref Dictionary<long, Stream> replaceStreams)
