@@ -58,7 +58,7 @@ namespace Helper
             };
             foreach (var fileName in FILE_NAMES)
             {
-                if (!File.Exists($"out/{fileName}-mod")) continue;
+                if (!File.Exists($"out/{fileName}-mod") || !File.Exists($"out/{fileName}-header")) continue;
                 Bundle bundleData;
                 using (var reader = new BundleHelper.EndianBinaryReader(File.OpenRead($"out/{fileName}-mod")))
                 {
@@ -93,6 +93,8 @@ namespace Helper
                         fileStream.Write(memoryStream.ToArray());
                     }
                 }
+                File.Delete($"out/{fileName}-mod");
+                File.Delete($"out/{fileName}-header");
             }
         }
 
