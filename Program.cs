@@ -204,6 +204,11 @@ namespace Helper
                 m_Type = TypeTreeHelper.LoadTypeTree(new BinaryReader(fs));
             }
             var type = m_Texture2D.ToType(m_Type);
+            if (m_Texture2D.m_Name.Contains("TELOP") && m_Texture2D.assetsFile.m_TargetPlatform == BuildTarget.Switch)
+            {
+                type["m_IsPreProcessed"] = false;
+                ((List<object>)type["m_PlatformBlob"]!).Clear();
+            }
 
             int width = (int)type["m_Width"]!;
             int height = (int)type["m_Height"]!;
