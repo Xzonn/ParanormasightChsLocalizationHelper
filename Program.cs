@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Specialized;
 using System.Drawing;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Helper
 {
@@ -22,9 +23,29 @@ namespace Helper
             CreatePatchFolder();
         }
 
+        static Dictionary<string, string> LoadTranslation()
+        {
+            Dictionary<string, string> data = new();
+            foreach (string fileName in Directory.GetFiles("texts/zh_Hans/"))
+            {
+                string[] lines = File.ReadAllLines(fileName);
+                foreach (string line in lines)
+                {
+                    string[] parts = line.Split(",");
+                    if (parts.Length == 2)
+                    {
+                        data.Add(parts[0], parts[1]);
+                    }
+                }
+            }
+            return data;
+        }
+
         static void RemoveHeader()
         {
             string[] FILE_NAMES = {
+                "a021",
+                "a024",
                 "a035",
                 "a036",
                 "a038",
@@ -52,6 +73,8 @@ namespace Helper
         static void AddHeader()
         {
             string[] FILE_NAMES = {
+                "a021",
+                "a024",
                 "a035",
                 "a036",
                 "a038",
@@ -65,17 +88,17 @@ namespace Helper
                     bundleData = new Bundle(reader);
                 }
 
-                bool changed = false;
+                List<string> fileList = new();
                 foreach (var file in bundleData.FileList)
                 {
                     if (File.Exists($"out/{file.fileName}"))
                     {
                         Console.WriteLine($"Replacing: {file.fileName}");
                         file.stream = File.OpenRead($"out/{file.fileName}");
-                        changed = true;
+                        fileList.Add($"out/{file.fileName}");
                     }
                 }
-                if (!changed)
+                if (fileList.Count == 0)
                 {
                     continue;
                 }
@@ -93,6 +116,7 @@ namespace Helper
                         fileStream.Write(memoryStream.ToArray());
                     }
                 }
+                fileList.ForEach(file => File.Delete(file));
                 File.Delete($"out/{fileName}-mod");
                 File.Delete($"out/{fileName}-header");
             }
@@ -100,9 +124,13 @@ namespace Helper
 
         static void MakePatch()
         {
+            var translation = LoadTranslation();
+
             string[] FILE_NAMES = {
                 "files/resources.assets",
                 "files/sharedassets0.assets",
+                "out/a021-mod",
+                "out/a024-mod",
                 "out/a035-mod",
                 "out/a036-mod",
                 "out/a038-mod",
@@ -119,9 +147,7 @@ namespace Helper
                 {
                     if (@object is TextAsset m_TextAsset)
                     {
-                        string filePath = $"texts/zh_Hans/{m_TextAsset.m_Name.Replace("_EN", "")}.txt";
-                        if (!File.Exists(filePath)) { continue; }
-                        ReplaceText(m_TextAsset, filePath, ref replaceStreams);
+                        ReplaceText(m_TextAsset, ref replaceStreams, translation);
                     }
                     else if ((@object is MonoBehaviour m_MonoBehaviour)
                         && m_MonoBehaviour.m_Script.TryGet(out var m_Script)
@@ -135,10 +161,9 @@ namespace Helper
                     {
                         ReplaceTMPAtlas(m_Texture2D, ref replaceStreams);
                     }
-                    else if ((@object is AssetStudio.Font m_Font)
-                        && File.Exists($"files/{m_Font.m_Name}.ttf"))
+                    else if ((@object is AssetStudio.Font m_Font))
                     {
-                        // ReplaceTrueTypeFont(m_Font, ref replaceStreams);
+                        ReplaceTrueTypeFont(m_Font, ref replaceStreams);
                     }
                 }
                 if (replaceStreams.Count == 0)
@@ -150,15 +175,46 @@ namespace Helper
                 assetsFile.SaveAs($"out/{fileName}", replaceStreams);
                 replaceStreams.Values.ToList().ForEach(x => x.Close());
             }
+
+            manager.Clear();
         }
 
-        static void ReplaceText(TextAsset m_TextAsset, string filePath, ref Dictionary<long, Stream> replaceStreams)
+        static void ReplaceText(TextAsset m_TextAsset, ref Dictionary<long, Stream> replaceStreams, Dictionary<string, string> translation)
         {
+            var TEXT_LINE_PATTERN = new Regex(@"(?<=[,\(])(text=""?|name=""?|WindowMessage:).+?((?:""?,(?:.+,)?|\|)txtid=([0-9a-zA-Z_]+))(?=[,\)])");
+
             MemoryStream memoryStream = new();
             BinaryWriter bw = new(memoryStream);
             var type = m_TextAsset.ToType();
-            var text = File.ReadAllText(filePath);
-            type["m_Script"] = text;
+            if (type == null) return;
+            string filePath = $"texts/zh_Hans/{m_TextAsset.m_Name.Replace("_JP", "")}.txt";
+            if (File.Exists(filePath))
+            {
+                var text = File.ReadAllText(filePath);
+                type["m_Script"] = text;
+            }
+            else
+            {
+                var text = (string)type["m_Script"]!;
+                text = TEXT_LINE_PATTERN.Replace(text, x =>
+                {
+                    if (!translation.TryGetValue(x.Groups[3].Value, out var result))
+                    {
+                        return x.Groups[0].Value;
+                    }
+                    if (x.Groups[1].Value.Contains('"'))
+                    {
+                        result = Uri.EscapeDataString(result);
+                    }
+                    return $"{x.Groups[1].Value}{result}{x.Groups[2].Value}";
+                });
+                if ((string)type["m_Script"]! == text)
+                {
+                    return;
+                }
+                File.WriteAllText($"out/scripts/{m_TextAsset.m_Name}.txt", text);
+                type["m_Script"] = text;
+            }
             var m_Type = m_TextAsset.serializedType?.m_Type;
             TypeTreeHelper.WriteType(type, m_Type, bw);
             replaceStreams[m_TextAsset.m_PathID] = memoryStream;
@@ -249,13 +305,16 @@ namespace Helper
                 m_Type = TypeTreeHelper.LoadTypeTree(new BinaryReader(fs));
             }
             var type = m_Font.ToType(m_Type);
-            File.WriteAllText($"out/{m_Font.m_Name}.json", JsonConvert.SerializeObject(type, Formatting.Indented));
-            type["m_FontData"] = File.ReadAllBytes($"files/{m_Font.m_Name}.ttf").Select(x => (object)x).ToList();
+            // File.WriteAllText($"out/{m_Font.m_Name}.json", JsonConvert.SerializeObject(type, Formatting.Indented));
+            // type["m_FontData"] = File.ReadAllBytes($"files/{m_Font.m_Name}.ttf").Select(x => (object)x).ToList();
+            ((List<object>)type["m_FontData"]!).Clear();
 
             MemoryStream memoryStream = new();
             BinaryWriter bw = new(memoryStream);
             TypeTreeHelper.WriteType(type, m_Type, bw);
             replaceStreams[m_Font.m_PathID] = memoryStream;
+
+            Console.WriteLine($"Replacing: (Font) {m_Font.assetsFile.fileName}/{m_Font.m_Name}");
         }
 
         static void CreatePatchFolder()
@@ -263,6 +322,8 @@ namespace Helper
             Directory.CreateDirectory("out/patch/PARANORMASIGHT_Data/StreamingAssets/");
             Copy("out/resources.assets", "out/patch/PARANORMASIGHT_Data/resources.assets");
             Copy("out/sharedassets0.assets", "out/patch/PARANORMASIGHT_Data/sharedassets0.assets");
+            Copy("out/a021", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a021");
+            Copy("out/a024", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a024");
             Copy("out/a035", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a035");
             Copy("out/a036", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a036");
             Copy("out/a038", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a038");
