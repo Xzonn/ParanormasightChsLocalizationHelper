@@ -212,7 +212,6 @@ namespace Helper
                 {
                     return;
                 }
-                File.WriteAllText($"out/scripts/{m_TextAsset.m_Name}.txt", text);
                 type["m_Script"] = text;
             }
             var m_Type = m_TextAsset.serializedType?.m_Type;
