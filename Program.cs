@@ -1,6 +1,5 @@
 ﻿using AssetStudio;
 using BundleHelper;
-using Ionic.Zip;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Specialized;
@@ -206,7 +205,15 @@ namespace Helper
             else
             {
                 var text = (string)type["m_Script"]!;
-                text = Regex.Replace(text, @"^(11\d\.cam\.fo\(\))$", "100.dt.jpif(label=exit,cond=%ACCOUNTNAME==\"TENOKE\")\n$1", RegexOptions.Multiline);
+                text = Regex.Replace(text, @"^(11\d\.cam\.fo\(\))(?=[\r\n])", "100.dt.jpif(label=exit,cond=%ACCOUNTNAME==\"TENOKE\")\r\n$1", RegexOptions.Multiline);
+                foreach (var file_from in Directory.GetFiles("files/script_replace/", $"{m_TextAsset.m_Name}_*.from"))
+                {
+                    var file_to = Path.ChangeExtension(file_from, ".to");
+                    if (!File.Exists(file_to)) { continue; }
+                    var string_from = File.ReadAllText(file_from).Replace("\n", "\r\n").Replace("\r\r\n", "\r\n");
+                    var string_to = File.ReadAllText(file_to).Replace("\n", "\r\n").Replace("\r\r\n", "\r\n");
+                    text = text.Replace(string_from, string_to);
+                }
                 text = TEXT_LINE_PATTERN.Replace(text, x =>
                 {
                     if (!translation.TryGetValue(x.Groups[3].Value, out var result))
@@ -219,14 +226,6 @@ namespace Helper
                     }
                     return $"{x.Groups[1].Value}{result}{x.Groups[2].Value}";
                 });
-                foreach (var file_from in Directory.GetFiles("files/script_replace/", $"{m_TextAsset.m_Name}_*.from"))
-                {
-                    var file_to = Path.ChangeExtension(file_from, ".to");
-                    if (!File.Exists(file_to)) { continue; }
-                    var string_from = File.ReadAllText(file_from);
-                    var string_to = File.ReadAllText(file_to);
-                    text = text.Replace(string_from, string_to);
-                }
                 if ((string)type["m_Script"]! == text)
                 {
                     return;
