@@ -197,15 +197,23 @@ namespace Helper
             var type = m_Texture2D.ToType(m_Type);
             byte[] oldData = (byte[])type["image data"]!;
 
-            if (File.Exists($"files/Texture2D/{m_Texture2D.m_Name}.bin")
-                && !(m_Texture2D.assetsFile.fileName == "CAB-b1cf5d792b9389884d6c327bca126287" && m_Texture2D.m_Name.Contains("logo")))
+            var textureFileName = $"{m_Texture2D.m_Name}.bin";
+            if (m_Texture2D.assetsFile.fileName == "CAB-b1cf5d792b9389884d6c327bca126287" && m_Texture2D.m_Name.Contains("logo"))
             {
-                if (m_Texture2D.m_Name.Contains("TELOP") && m_Texture2D.assetsFile.m_TargetPlatform == BuildTarget.Switch)
+                textureFileName = $"{m_Texture2D.m_Name}_a021.bin";
+            }
+            if (File.Exists($"files/Texture2D/{textureFileName}"))
+            {
+                if (m_Texture2D.assetsFile.m_TargetPlatform == BuildTarget.Switch)
                 {
                     type["m_IsPreProcessed"] = false;
                     ((List<object>)type["m_PlatformBlob"]!).Clear();
+                    if (m_Texture2D.m_TextureFormat == TextureFormat.ASTC_RGB_8x8)
+                    {
+                        type["m_TextureFormat"] = (int)TextureFormat.DXT5Crunched;
+                    }
                 }
-                byte[] rawData = File.ReadAllBytes($"files/Texture2D/{m_Texture2D.m_Name}.bin");
+                byte[] rawData = File.ReadAllBytes($"files/Texture2D/{textureFileName}");
                 type["m_CompleteImageSize"] = (uint)rawData.Length;
 
                 if (replaceResS && oldData.Length == 0)
