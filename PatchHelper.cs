@@ -19,8 +19,11 @@ namespace Helper
 
     internal class PatchHelper
     {
+
         static Dictionary<string, string> LoadTranslation()
         {
+            var UNDER_LINE_PATTERN = new Regex(@"<u>(.+?)</u>");
+
             Dictionary<string, string> data = new();
             foreach (string fileName in Directory.GetFiles("texts/zh_Hans/"))
             {
@@ -30,7 +33,10 @@ namespace Helper
                     string[] parts = line.Split(",");
                     if (parts.Length == 2)
                     {
-                        data.Add(parts[0], parts[1]);
+                        var text_id = parts[0];
+                        var text_content = parts[1];
+                        text_content = UNDER_LINE_PATTERN.Replace(text_content, x => string.Join("", x.Groups[1].Value.Select(y => $"[f]{y}")));
+                        data.Add(text_id, text_content);
                     }
                 }
             }
@@ -40,6 +46,11 @@ namespace Helper
         public static void MakePatch()
         {
             var translation = LoadTranslation();
+            var TEXT_FILE_BLACKLIST = new List<string>()
+            {
+                "command_test",
+                "command_test2",
+            };
 
             string[] FILE_NAMES = {
                 "files/resources.assets",
@@ -66,7 +77,7 @@ namespace Helper
                     {
                         ReplaceTexture2D(m_Texture2D, replaceResS, ref replaceStreams, ref texture2DList);
                     }
-                    else if (@object is TextAsset m_TextAsset)
+                    else if (@object is TextAsset m_TextAsset && !TEXT_FILE_BLACKLIST.Contains(m_TextAsset.m_Name))
                     {
                         ReplaceText(m_TextAsset, ref replaceStreams, translation);
                     }
@@ -123,13 +134,21 @@ namespace Helper
             else
             {
                 var text = (string)type["m_Script"]!;
-                text = Regex.Replace(text, @"^(11\d\.cam\.fo\(\))(?=[\r\n])", "100.dt.jpif(label=exit,cond=%ACCOUNTNAME==\"TENOKE\")\r\n$1", RegexOptions.Multiline);
+                var crlf = text.Contains("\r\n");
+                if (!crlf)
+                {
+                    Console.WriteLine($"Converting LF to CRLF: (TextAsset) {m_TextAsset.assetsFile.fileName}/{m_TextAsset.m_Name}");
+                    text = text.Replace("\n", "\r\n");
+                }
+                // text = Regex.Replace(text, @"^(11\d\.cam\.fo\(\))(?=[\r\n])", "100.dt.jpif(label=exit,cond=%ACCOUNTNAME==\"TENOKE\")\r\n$1", RegexOptions.Multiline);
                 foreach (var file_from in Directory.GetFiles("files/script_replace/", $"{m_TextAsset.m_Name}_*.from"))
                 {
                     var file_to = Path.ChangeExtension(file_from, ".to");
                     if (!File.Exists(file_to)) { continue; }
-                    var string_from = File.ReadAllText(file_from).Replace("\n", "\r\n").Replace("\r\r\n", "\r\n");
-                    var string_to = File.ReadAllText(file_to).Replace("\n", "\r\n").Replace("\r\r\n", "\r\n");
+                    var string_from = File.ReadAllText(file_from);
+                    if (!string_from.Contains("\r\n")) { string_from = string_from.Replace("\n", "\r\n"); }
+                    var string_to = File.ReadAllText(file_to);
+                    if (!string_to.Contains("\r\n")) { string_to = string_to.Replace("\n", "\r\n"); }
                     text = text.Replace(string_from, string_to);
                 }
                 text = TEXT_LINE_PATTERN.Replace(text, x =>
@@ -144,6 +163,10 @@ namespace Helper
                     }
                     return $"{x.Groups[1].Value}{result}{x.Groups[2].Value}";
                 });
+                if (!crlf)
+                {
+                    text = text.Replace("\r\n", "\n");
+                }
                 if ((string)type["m_Script"]! == text)
                 {
                     return;
