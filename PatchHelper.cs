@@ -286,7 +286,7 @@ namespace Helper
 
         static void SaveTexture2D(string platform, string fileName, ref Dictionary<long, Stream> replaceStreams, ref List<Texture2DHelper> texture2DList)
         {
-            var writer = File.Create($"out/{fileName}.resS");
+            var writer = File.Create($"out/{platform}/{fileName}.resS");
             TypeTree m_Type;
 
             using (var fs = File.OpenRead("files/TypeTree/Texture2D.bin"))
