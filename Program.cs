@@ -17,11 +17,21 @@ namespace Helper
             Directory.CreateDirectory("out/");
 
             BundleExtractor.ExtractNewBundle();
-            HeaderHelper.RemoveHeader();
-            PatchHelper.MakePatch();
-            HeaderHelper.AddHeader();
-            PatchHelper.CreatePatchFolder();
-            PatchHelper.CleanDirectory();
+
+            string[] PLATFORMS = {
+                "Windows",
+                "Switch"
+            };
+            foreach (var platform in PLATFORMS)
+            {
+                Console.WriteLine($"--------------------\nPlatform: {platform}");
+                Directory.CreateDirectory($"out/{platform}/");
+                HeaderHelper.RemoveHeader(platform);
+                PatchHelper.MakePatch(platform);
+                HeaderHelper.AddHeader(platform);
+                PatchHelper.CreatePatchFolder(platform);
+                PatchHelper.CleanDirectory(platform);
+            }
         }
     }
 }

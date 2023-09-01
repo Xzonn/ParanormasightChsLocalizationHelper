@@ -19,7 +19,6 @@ namespace Helper
 
     internal class PatchHelper
     {
-
         static Dictionary<string, string> LoadTranslation()
         {
             var UNDER_LINE_PATTERN = new Regex(@"<u>(.+?)</u>");
@@ -43,7 +42,7 @@ namespace Helper
             return data;
         }
 
-        public static void MakePatch()
+        public static void MakePatch(string platform)
         {
             var translation = LoadTranslation();
             var TEXT_FILE_BLACKLIST = new List<string>()
@@ -53,13 +52,13 @@ namespace Helper
             };
 
             string[] FILE_NAMES = {
-                "files/resources.assets",
-                "files/sharedassets0.assets",
-                "out/a021-mod",
-                "out/a024-mod",
-                "out/a035-mod",
-                "out/a036-mod",
-                "out/a038-mod",
+                $"files/{platform}/resources.assets",
+                $"files/{platform}/sharedassets0.assets",
+                $"out/{platform}/a021-mod",
+                $"out/{platform}/a024-mod",
+                $"out/{platform}/a035-mod",
+                $"out/{platform}/a036-mod",
+                $"out/{platform}/a038-mod",
             };
             AssetsManager manager = new();
 
@@ -75,7 +74,7 @@ namespace Helper
                 {
                     if (@object is Texture2D m_Texture2D)
                     {
-                        ReplaceTexture2D(m_Texture2D, replaceResS, ref replaceStreams, ref texture2DList);
+                        ReplaceTexture2D(platform, m_Texture2D, replaceResS, ref replaceStreams, ref texture2DList);
                     }
                     else if (@object is TextAsset m_TextAsset && !TEXT_FILE_BLACKLIST.Contains(m_TextAsset.m_Name))
                     {
@@ -93,14 +92,14 @@ namespace Helper
                         ReplaceTrueTypeFont(m_Font, ref replaceStreams);
                     }
                 }
-                if (replaceResS) { SaveTexture2D(assetsFile.fileName, ref replaceStreams, ref texture2DList); }
+                if (replaceResS) { SaveTexture2D(platform, assetsFile.fileName, ref replaceStreams, ref texture2DList); }
                 if (replaceStreams.Count == 0)
                 {
                     continue;
                 }
 
                 Console.WriteLine($"Saving: {fileName}");
-                assetsFile.SaveAs($"out/{fileName}", replaceStreams);
+                assetsFile.SaveAs($"out/{platform}/{fileName}", replaceStreams);
                 replaceStreams.Values.ToList().ForEach(x => x.Close());
             }
 
@@ -209,7 +208,7 @@ namespace Helper
             Console.WriteLine($"Replacing: (MonoBehaviour) {m_MonoBehaviour.assetsFile.fileName}/{m_MonoBehaviour.m_Name}");
         }
 
-        static void ReplaceTexture2D(Texture2D m_Texture2D, bool replaceResS, ref Dictionary<long, Stream> replaceStreams, ref List<Texture2DHelper> texture2DList)
+        static void ReplaceTexture2D(string platform, Texture2D m_Texture2D, bool replaceResS, ref Dictionary<long, Stream> replaceStreams, ref List<Texture2DHelper> texture2DList)
         {
             var m_Type = m_Texture2D.serializedType?.m_Type;
             if (m_Type == null)
@@ -276,7 +275,7 @@ namespace Helper
                 uint size = (uint)m_StreamData["size"]!;
                 texture2DList.Add(new Texture2DHelper()
                 {
-                    path = $"out/old-{path}",
+                    path = $"out/{platform}/old-{path}",
                     offset = offset,
                     size = size,
                     type = type,
@@ -285,7 +284,7 @@ namespace Helper
             }
         }
 
-        static void SaveTexture2D(string fileName, ref Dictionary<long, Stream> replaceStreams, ref List<Texture2DHelper> texture2DList)
+        static void SaveTexture2D(string platform, string fileName, ref Dictionary<long, Stream> replaceStreams, ref List<Texture2DHelper> texture2DList)
         {
             var writer = File.Create($"out/{fileName}.resS");
             TypeTree m_Type;
@@ -306,7 +305,7 @@ namespace Helper
                 if (item.size == 0) { }
                 else if (item.path != "")
                 {
-                    Debug.Assert(item.path == $"out/old-{fileName}.resS");
+                    Debug.Assert(item.path == $"out/{platform}/old-{fileName}.resS");
                     using var reader = File.OpenRead(item.path);
                     reader.Seek((long)item.offset, SeekOrigin.Begin);
                     byte[] buffer = new byte[item.size];
@@ -347,16 +346,23 @@ namespace Helper
             Console.WriteLine($"Replacing: (Font) {m_Font.assetsFile.fileName}/{m_Font.m_Name}");
         }
 
-        public static void CreatePatchFolder()
+        public static void CreatePatchFolder(string platform)
         {
-            Directory.CreateDirectory("out/patch/PARANORMASIGHT_Data/StreamingAssets/");
-            Copy("out/resources.assets", "out/patch/PARANORMASIGHT_Data/resources.assets");
-            Copy("out/sharedassets0.assets", "out/patch/PARANORMASIGHT_Data/sharedassets0.assets");
-            Copy("out/a021", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a021");
-            Copy("out/a024", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a024");
-            Copy("out/a035", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a035");
-            Copy("out/a036", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a036");
-            Copy("out/a038", "out/patch/PARANORMASIGHT_Data/StreamingAssets/a038");
+            string root = platform switch
+            {
+                "Windows" => "out/patch/Windows/PARANORMASIGHT_Data",
+                "Switch" => "out/patch/Switch/01006e5019c5a000/romfs/Data",
+                _ => "",
+            };
+            
+            Directory.CreateDirectory($"{root}/StreamingAssets/");
+            Copy($"out/{platform}/resources.assets", $"{root}/resources.assets");
+            Copy($"out/{platform}/sharedassets0.assets", $"{root}/sharedassets0.assets");
+            Copy($"out/{platform}/a021", $"{root}/StreamingAssets/a021");
+            Copy($"out/{platform}/a024", $"{root}/StreamingAssets/a024");
+            Copy($"out/{platform}/a035", $"{root}/StreamingAssets/a035");
+            Copy($"out/{platform}/a036", $"{root}/StreamingAssets/a036");
+            Copy($"out/{platform}/a038", $"{root}/StreamingAssets/a038");
         }
 
         private static void Copy(string source, string destination)
@@ -365,13 +371,13 @@ namespace Helper
             File.Copy(source, destination, true);
         }
 
-        public static void CleanDirectory()
+        public static void CleanDirectory(string platform)
         {
 #if !DEBUG
-            Directory.GetFiles("out/", "old-CAB-*").ToList().ForEach((x) => File.Delete(x));
-            Directory.GetFiles("out/", "CAB-*").ToList().ForEach((x) => File.Delete(x));
-            Directory.GetFiles("out/", "*-mod").ToList().ForEach((x) => File.Delete(x));
-            Directory.GetFiles("out/", "*-header").ToList().ForEach((x) => File.Delete(x));
+            Directory.GetFiles($"out/{platform}/", "old-CAB-*").ToList().ForEach((x) => File.Delete(x));
+            Directory.GetFiles($"out/{platform}/", "CAB-*").ToList().ForEach((x) => File.Delete(x));
+            Directory.GetFiles($"out/{platform}/", "*-mod").ToList().ForEach((x) => File.Delete(x));
+            Directory.GetFiles($"out/{platform}/", "*-header").ToList().ForEach((x) => File.Delete(x));
 #endif
         }
     }
