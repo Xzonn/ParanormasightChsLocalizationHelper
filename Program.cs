@@ -1,11 +1,4 @@
 ﻿using AssetStudio;
-using BundleHelper;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.Collections.Specialized;
-using System.Drawing;
-using System.Text;
-using System.Text.RegularExpressions;
 
 namespace Helper
 {

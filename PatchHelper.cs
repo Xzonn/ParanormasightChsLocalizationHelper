@@ -110,24 +110,22 @@ namespace Helper
         {
             var TEXT_LINE_PATTERN = new Regex(@"(?<=[,\(])(text=""?|name=""?|WindowMessage:).+?((?:""?,(?:.+,)?|\|)txtid=([0-9a-zA-Z_]+))(?=[,\)])");
 
+            if (m_TextAsset.m_Name == "UniTask" && m_TextAsset.assetsFile.m_TargetPlatform != BuildTarget.Switch) { return; }
+
             MemoryStream memoryStream = new();
             BinaryWriter bw = new(memoryStream);
-            var type = m_TextAsset.ToType();
-            if (type == null) return;
+            var m_Type = m_TextAsset.serializedType?.m_Type;
+            if (m_Type == null)
+            {
+                using var fs = File.OpenRead("files/TypeTree/Text.bin");
+                m_Type = TypeTreeHelper.LoadTypeTree(new BinaryReader(fs));
+            }
+            var type = m_TextAsset.ToType(m_Type);
+
             string filePath = $"texts/zh_Hans/{m_TextAsset.m_Name.Replace("_JP", "")}.txt";
             if (File.Exists(filePath))
             {
                 var text = File.ReadAllText(filePath);
-                var version = Environment.GetEnvironmentVariable("XZ_PATCH_VERSION");
-                if (string.IsNullOrEmpty(version))
-                {
-                    version = "dev_unk";
-                }
-                else if (version.Length > 7)
-                {
-                    version = version[..7];
-                }
-                text = text.Replace("{{ version }}", version);
                 type["m_Script"] = text;
             }
             else
@@ -172,7 +170,16 @@ namespace Helper
                 }
                 type["m_Script"] = text;
             }
-            var m_Type = m_TextAsset.serializedType?.m_Type;
+            var version = Environment.GetEnvironmentVariable("XZ_PATCH_VERSION");
+            if (string.IsNullOrEmpty(version))
+            {
+                version = "dev_unk";
+            }
+            else if (version.Length > 7)
+            {
+                version = version[..7];
+            }
+            type["m_Script"] = ((string)type["m_Script"]!).Replace("{{ version }}", version);
             TypeTreeHelper.WriteType(type, m_Type, bw);
             replaceStreams[m_TextAsset.m_PathID] = memoryStream;
 
