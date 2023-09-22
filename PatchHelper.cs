@@ -30,11 +30,11 @@ namespace Helper
                 foreach (string line in lines)
                 {
                     string[] parts = line.Split(",");
-                    if (parts.Length == 2)
+                    if (parts.Length >= 2)
                     {
                         var text_id = parts[0];
-                        var text_content = parts[1];
-                        text_content = UNDER_LINE_PATTERN.Replace(text_content, x => string.Join("", x.Groups[1].Value.Select(y => $"[f]{y}")));
+                        var text_content = string.Join(",", parts.Skip(1));
+                        text_content = UNDER_LINE_PATTERN.Replace(text_content, x => string.Join("", x.Groups[1].Value.Select(y => $"[f\ue001]{y}")));
                         data.Add(text_id, text_content);
                     }
                 }
